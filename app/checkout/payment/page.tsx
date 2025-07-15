@@ -123,6 +123,8 @@ export default function PaymentPage() {
   }
 
   const handlePayment = async () => {
+    console.log("🚀 Starting payment process...")
+    
     if (cart.length === 0) {
       toast({
         title: "Cart is Empty",
@@ -152,6 +154,7 @@ export default function PaymentPage() {
     }
 
     setIsProcessing(true)
+    console.log("💳 Processing payment with method:", selectedPayment)
 
     try {
       const orderData = {
@@ -164,6 +167,8 @@ export default function PaymentPage() {
         totalAmount: finalTotal, // Pass total amount for server-side validation
       }
 
+      console.log("📦 Creating order with data:", orderData)
+
       // Create order on backend
       const createOrderRes = await fetch("/api/orders", {
         method: "POST",
@@ -174,24 +179,31 @@ export default function PaymentPage() {
         body: JSON.stringify(orderData),
       })
 
+      console.log("📋 Order creation response status:", createOrderRes.status)
       const orderResult = await createOrderRes.json()
+      console.log("📋 Order creation result:", orderResult)
 
       if (!orderResult.success) {
         throw new Error(orderResult.message || "Failed to create order.")
       }
 
       const orderId = orderResult.data.orderNumber // Backend returns orderNumber as ID
+      console.log("✅ Order created successfully with ID:", orderId)
 
       if (selectedPayment === "cod") {
+        console.log("💵 COD order - processing immediately")
         // COD order is confirmed immediately
-        router.push(`/checkout/success?orderId=${orderId}`)
         clearCart()
+        router.push(`/checkout/success?orderId=${orderId}`)
         return
       }
 
+      console.log("💳 Processing online payment via Razorpay")
+      
       // For online payments (UPI, Card, Netbanking, Wallet)
       const res = await loadRazorpayScript()
       if (!res) {
+        console.error("❌ Razorpay SDK failed to load")
         toast({
           title: "Payment Error",
           description: "Razorpay SDK failed to load. Please try again.",
@@ -201,20 +213,28 @@ export default function PaymentPage() {
         return
       }
 
+      console.log("✅ Razorpay SDK loaded successfully")
+
       // Get Razorpay order details from backend
+      console.log("🔄 Creating Razorpay order...")
       const razorpayOrderRes = await fetch("/api/payments/razorpay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: finalTotal, orderId: orderId }),
       })
+      
+      console.log("📋 Razorpay order response status:", razorpayOrderRes.status)
       const razorpayOrderData = await razorpayOrderRes.json()
+      console.log("📋 Razorpay order data:", razorpayOrderData)
 
       if (!razorpayOrderData.success) {
         throw new Error(razorpayOrderData.message || "Failed to create Razorpay order.")
       }
 
+      console.log("🔐 Fetching Razorpay key...")
       const razorpayKeyRes = await fetch("/api/payments/razorpay-key")
       const razorpayKeyData = await razorpayKeyRes.json()
+      console.log("🔐 Razorpay key data:", razorpayKeyData)
 
       if (!razorpayKeyData.success) {
         throw new Error(razorpayKeyData.message || "Failed to get Razorpay key.")
@@ -228,32 +248,47 @@ export default function PaymentPage() {
         description: `Payment for Order #${orderId}`,
         order_id: razorpayOrderData.data.id,
         handler: async (response: any) => {
-          const verifyRes = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              orderId: orderId, // Pass our internal order ID
-            }),
-          })
-          const verifyData = await verifyRes.json()
-
-          if (verifyData.success) {
-            toast({
-              title: "Payment Successful!",
-              description: "Your order has been placed.",
+          console.log("💳 Payment completed, verifying...", response)
+          
+          try {
+            const verifyRes = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                orderId: orderId, // Pass our internal order ID
+              }),
             })
-            clearCart()
-            router.push(`/checkout/success?orderId=${orderId}`)
-          } else {
+            
+            console.log("🔍 Verification response status:", verifyRes.status)
+            const verifyData = await verifyRes.json()
+            console.log("🔍 Verification result:", verifyData)
+
+            if (verifyData.success) {
+              console.log("✅ Payment verified successfully!")
+              toast({
+                title: "Payment Successful!",
+                description: "Your order has been placed.",
+              })
+              clearCart()
+              router.push(`/checkout/success?orderId=${orderId}`)
+            } else {
+              console.error("❌ Payment verification failed:", verifyData.message)
+              toast({
+                title: "Payment Failed",
+                description: verifyData.message || "Payment verification failed.",
+                variant: "destructive",
+              })
+            }
+          } catch (error) {
+            console.error("❌ Error during payment verification:", error)
             toast({
-              title: "Payment Failed",
-              description: verifyData.message || "Payment verification failed.",
+              title: "Payment Verification Error",
+              description: "An error occurred while verifying payment.",
               variant: "destructive",
             })
-            // Optionally update order status to failed on backend
           }
         },
         prefill: {
@@ -269,15 +304,20 @@ export default function PaymentPage() {
         },
       }
 
+      console.log("🚀 Opening Razorpay checkout with options:", options)
+      
       const rzp1 = new window.Razorpay(options)
+      
       rzp1.on("payment.failed", (response: any) => {
+        console.error("❌ Razorpay payment failed:", response)
         toast({
           title: "Payment Failed",
           description: response.error.description || "Payment failed. Please try again.",
           variant: "destructive",
         })
-        // Optionally update order status to failed on backend
+        setIsProcessing(false)
       })
+      
       rzp1.open()
     } catch (error: any) {
       console.error("Checkout error:", error)
