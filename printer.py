@@ -55,7 +55,7 @@ if __name__ == "__main__":
     ]
     
     # 🔧 Output file where results will be saved
-    output = r"C:\Users\srima\OneDrive\Desktop\portfolio\agri-check\output.txt"
+    output = "output.txt"
 
     save_files_data(files, output)
     print(f"Data saved to {output}")

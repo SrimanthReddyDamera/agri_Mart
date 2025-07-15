@@ -9,10 +9,14 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function CartPage() {
   const { items: cart, removeFromCart, updateQuantity, clearCart, getTotalItems, getTotalPrice } = useCart()
   const { toast } = useToast()
+  const router = useRouter()
+  const { isAuthenticated } = useAuth()
 
   const cartItemsCount = getTotalItems()
   const cartTotal = getTotalPrice()
@@ -30,7 +34,18 @@ export default function CartPage() {
       })
       return
     }
-    window.location.href = "/checkout/payment"
+    
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to proceed with checkout.",
+        variant: "destructive",
+      })
+      router.push("/auth/login?redirect=/checkout/payment")
+      return
+    }
+    
+    router.push("/checkout/payment")
   }
 
   const handleRemoveItem = (productId: string) => {
