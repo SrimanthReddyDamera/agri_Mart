@@ -1,4 +1,4 @@
-import { ProductCard } from "@/components/product-card"
+import ProductCard from "@/components/product-card"
 
 const similarProducts = [
   {
@@ -58,3 +58,5 @@ export function SimilarProducts({ productId }: SimilarProductsProps) {
     </div>
   )
 }
+
+export default SimilarProducts

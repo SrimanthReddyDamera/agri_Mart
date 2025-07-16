@@ -20,14 +20,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      setItems(JSON.parse(savedCart))
+    // Only access localStorage on client side
+    if (typeof window !== "undefined") {
+      const savedCart = localStorage.getItem("cart")
+      if (savedCart) {
+        setItems(JSON.parse(savedCart))
+      }
     }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(items))
+    // Only access localStorage on client side
+    if (typeof window !== "undefined") {
+      localStorage.setItem("cart", JSON.stringify(items))
+    }
   }, [items])
 
   const addToCart = (newItem: CartItem) => {

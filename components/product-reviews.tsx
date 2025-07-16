@@ -124,3 +124,5 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     </div>
   )
 }
+
+export default ProductReviews
